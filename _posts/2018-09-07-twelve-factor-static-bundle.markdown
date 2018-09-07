@@ -1,3 +1,10 @@
+---
+layout: post
+title:  "Injecting Config into Static Client Bundles"
+date:   2018-09-07 14:09:51 -0600
+categories: docker nginx angularjs
+---
+
 At Prodata Key, we agree with the tenets presented by Heroku's [Twelve-Factor App](https://12factor.net/) methodology. We hope to apply these principles to all parts of our architecture.
 
 One part of our architecture is an Nginx Docker container which serves our web application bundle. It was difficult to determine how certain parts of Twelve Factor would apply to this. Specifically, in the ["Config" factor:](https://12factor.net/config)
@@ -9,57 +16,63 @@ The question is: how can we configure this bundle, which executes on the user's 
 Here's how we did it:
 
 
-## The `index.html` ##
+## The index.html ##
 To expose these environment variables to the client JS, we add the following to our index.html:
 
-    <!-- Try this for an AngularJS app: -->
-    <script>
-        angular.module('app').constant('envRuntimeConfig', {
-            //GLOBAL_CONFIG_TOKEN
-        });
-    </script>
-    
-    <!-- Or, for a more general purpose solution: -->
-    <script>
-        var ENV_RUNTIME_CONFIG = {
-            //GLOBAL_CONFIG_TOKEN
-        };
-    </script>
+{% highlight html %}
+<!-- Try this for an AngularJS app: -->
+<script>
+    angular.module('app').constant('envRuntimeConfig', {
+        //GLOBAL_CONFIG_TOKEN
+    });
+</script>
+
+<!-- Or, for a more general purpose solution: -->
+<script>
+    var ENV_RUNTIME_CONFIG = {
+        //GLOBAL_CONFIG_TOKEN
+    };
+</script>
+{% endhighlight %}
 
 The key here is that we provide our application a configuration object. Although the object is currently empty, (except for the comment,) it is valid JavaScript on its own, so it will still run correctly even when bundled and run through some live dev server.
 
 What is the `//GLOBAL_CONFIG_TOKEN`? It's just a unique string that we are able to replace on the fly when the app is served through nginx. So how do we do that?
 
 
-## The `nginx.conf` ##
+## The nginx.conf ##
 Let's look at the relevant snippet from our nginx.conf:
 
-    location / {
-        try_files $uri $uri/ /index.html =404;
-        sub_filter '//GLOBAL_CONFIG_TOKEN'  '${MY_ENV_CONSTANTS}';
-        sub_filter_once on;
-    }
+{% highlight nginx %}
+location / {
+    try_files $uri $uri/ /index.html =404;
+    sub_filter '//GLOBAL_CONFIG_TOKEN'  '${MY_ENV_CONSTANTS}';
+    sub_filter_once on;
+}
+{% endhighlight %}
 
 There's an Nginx module called [http://nginx.org/en/docs/http/ngx_http_sub_module.html](ngx_http_sub_module) which is included by default in the Nginx Docker image. This module provides us with the ability to replace arbitrary strings with other strings. We specify the `sub_filter_once` option as a minor optimization so that it only tries to replace one instance of the string.
 
 However, the syntax seen here to swap in `MY_ENV_CONSTANTS` isn't the actual syntax for injecting environment variables into nginx.conf. In fact, ["out-of-the-box, nginx doesn't support environment variables in most configuration blocks."](https://docs.docker.com/samples/library/nginx/#using-environment-variables-in-nginx-configuration) So how does this work? We need one more piece to make this work.
 
 
-## The `Dockerfile` ##
+## The Dockerfile ##
 We use [multi-stage builds](https://docs.docker.com/develop/develop-images/multistage-build/) to prepare our application bundle for our Nginx image. Here is just the final stage of our Dockerfile:
 
-    FROM nginx:alpine
+{% highlight conf %}
+FROM nginx:alpine
 
-    RUN apk add --no-cache tini
-    ENTRYPOINT ["/sbin/tini", "--"]
+RUN apk add --no-cache tini
+ENTRYPOINT ["/sbin/tini", "--"]
 
-    # ... copy in application bundle ...
+# ... copy in application bundle ...
 
-    COPY nginx/default.template /etc/nginx/conf.d/default.template
+COPY nginx/default.template /etc/nginx/conf.d/default.template
 
-    ENV MY_ENV_CONSTANTS ''
+ENV MY_ENV_CONSTANTS ''
 
-    CMD /bin/sh -c "envsubst '\$MY_ENV_CONSTANTS' < /etc/nginx/conf.d/default.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+CMD /bin/sh -c "envsubst '\$MY_ENV_CONSTANTS' < /etc/nginx/conf.d/default.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+{% endhighlight %}
 
 There are a few things going on here, so I'll talk about each one.
 
