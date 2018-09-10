@@ -2,7 +2,7 @@
 layout: post
 title:  "Injecting Config into Static Client Bundles"
 date:   2018-09-07 14:09:51 -0600
-categories: docker nginx angularjs
+tags: docker nginx angularjs
 ---
 
 At ProdataKey, we agree with the tenets presented by Heroku's [Twelve-Factor App](https://12factor.net/) methodology. We hope to apply these principles to all parts of our architecture.
