@@ -5,7 +5,7 @@ date:   2018-09-07 14:09:51 -0600
 categories: docker nginx angularjs
 ---
 
-At Prodata Key, we agree with the tenets presented by Heroku's [Twelve-Factor App](https://12factor.net/) methodology. We hope to apply these principles to all parts of our architecture.
+At ProdataKey, we agree with the tenets presented by Heroku's [Twelve-Factor App](https://12factor.net/) methodology. We hope to apply these principles to all parts of our architecture.
 
 One part of our architecture is an Nginx Docker container which serves our web application bundle. It was difficult to determine how certain parts of Twelve Factor would apply to this. Specifically, in the ["Config" factor:](https://12factor.net/config)
 
